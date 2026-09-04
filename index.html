@@ -1,0 +1,89 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>萬神守護 · 3D 模型資產庫</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root{ --bg:#151109; --ink:#E8DFC9; --ink2:#9C927C; --gold:#D9A93C; --ok:#5CB884; --bad:#E0705F; }
+  body{ margin:0; background:#151109; color:#E8DFC9; font:14px/1.7 "Noto Sans TC",system-ui,sans-serif; padding:28px 20px 60px; }
+  .wrap{ max-width:860px; margin:0 auto; }
+  h1{ font-size:20px; margin:0 0 4px; color:#D9A93C; letter-spacing:.04em; }
+  .sub{ color:#9C927C; margin:0 0 22px; font-size:13px; }
+  .panel{ border:1px solid #3A3122; border-radius:8px; padding:16px 18px; margin-bottom:20px; background:#1C1710; }
+  .big{ font-size:15px; font-weight:700; }
+  button{ background:#D9A93C; color:#1C1710; border:0; border-radius:6px; padding:9px 18px;
+          font:700 14px "Noto Sans TC",sans-serif; cursor:pointer; }
+  button:disabled{ opacity:.5; cursor:default; }
+  table{ border-collapse:collapse; width:100%; font-size:13px; }
+  th,td{ text-align:left; padding:5px 8px; border-bottom:1px solid #2A2318; }
+  th{ color:#9C927C; font-weight:400; }
+  td.n{ text-align:right; font-variant-numeric:tabular-nums; color:#9C927C; }
+  .ok{ color:#5CB884; } .bad{ color:#E0705F; } .wait{ color:#9C927C; }
+  code{ background:#241D14; padding:2px 6px; border-radius:4px; color:#D9A93C; font-size:12px; }
+</style>
+<div class="wrap">
+  <h1>萬神守護 Online · 3D 模型資產庫</h1>
+  <p class="sub">這一頁是工程用的自我檢測頁。按下按鈕會逐一抓取模型檔,確認這台主機可以被遊戲讀取。</p>
+
+  <div class="panel">
+    <p class="big" id="verdict">尚未檢測</p>
+    <p class="sub" id="detail">按下方按鈕開始。全部 ✓ 就代表主機設定正確,可以把網址交給工程接上遊戲。</p>
+    <button id="go">開始檢測</button>
+  </div>
+
+  <div class="panel">
+    <p class="sub" style="margin:0 0 8px">本頁網址(交給工程用的就是這個):</p>
+    <code id="base"></code>
+  </div>
+
+  <table>
+    <thead><tr><th>模型檔</th><th class="n">大小</th><th class="n">狀態</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+</div>
+<script>
+const FILES = ["emb_shangqing.glb","emb_taiqing.glb","emb_yuqing.glb","mob_amei.glb","mob_baiyuan.glb","mob_chishige.glb","mob_dengxiahua.glb","mob_lisheng.glb","mob_ns_dizang.glb","mob_ns_guandi.glb","mob_ns_guangze.glb","mob_ns_mazu.glb","mob_ns_nezha.glb","mob_ns_zhenwu.glb","mob_qingde.glb","mob_tangzhu.glb","mob_tianwei.glb","mob_wuming.glb","mob_xiukai.glb","mob_zhentian.glb","npc_god_dizang.glb","npc_god_guandi.glb","npc_god_guangze.glb","npc_god_mazu.glb","npc_god_nezha.glb","npc_god_zhenwu.glb","npc_sanqing_shangqing.glb","npc_sanqing_taiqing.glb","npc_sanqing_yuqing.glb","pc_dizang.glb","pc_guandi.glb","pc_guangze.glb","pc_mazu.glb","pc_nezha.glb","pc_zhenwu.glb","wpn_dizang.glb","wpn_guandi.glb","wpn_guangze.glb","wpn_mazu.glb","wpn_nezha.glb","wpn_zhenwu.glb"];
+const base = location.href.replace(/index\.html$/, '').replace(/[^/]*$/, '');
+document.getElementById('base').textContent = base;
+const tb = document.getElementById('rows');
+const cells = {};
+for (const f of FILES) {
+  const tr = document.createElement('tr');
+  tr.innerHTML = '<td>' + f + '</td><td class="n" data-sz>—</td><td class="n wait" data-st>待檢測</td>';
+  tb.appendChild(tr);
+  cells[f] = { sz: tr.querySelector('[data-sz]'), st: tr.querySelector('[data-st]') };
+}
+document.getElementById('go').addEventListener('click', async e => {
+  e.target.disabled = true;
+  const verdict = document.getElementById('verdict'), detail = document.getElementById('detail');
+  verdict.textContent = '檢測中…'; verdict.className = 'big wait';
+  let ok = 0, bad = 0, bytes = 0;
+  for (const f of FILES) {
+    const c = cells[f];
+    c.st.textContent = '…'; c.st.className = 'n wait';
+    try {
+      const r = await fetch(base + f, { cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const b = await r.arrayBuffer();
+      // GLB 檔頭必須是 'glTF'
+      const magic = new TextDecoder().decode(new Uint8Array(b, 0, 4));
+      if (magic !== 'glTF') throw new Error('不是 GLB(收到 ' + JSON.stringify(magic) + ')');
+      bytes += b.byteLength; ok++;
+      c.sz.textContent = (b.byteLength / 1024).toFixed(0) + ' KB';
+      c.st.textContent = '✓'; c.st.className = 'n ok';
+    } catch (err) {
+      bad++;
+      c.st.textContent = '✗ ' + err.message; c.st.className = 'n bad';
+    }
+    detail.textContent = '已檢測 ' + (ok + bad) + ' / ' + FILES.length;
+  }
+  if (bad === 0) {
+    verdict.textContent = '✓ 全部 ' + ok + ' 個模型都讀得到(' + (bytes / 1048576).toFixed(2) + ' MB)';
+    verdict.className = 'big ok';
+    detail.textContent = '主機設定正確。把上面那個網址交給工程,就可以接上遊戲了。';
+  } else {
+    verdict.textContent = '✗ ' + bad + ' 個失敗 / ' + ok + ' 個成功';
+    verdict.className = 'big bad';
+    detail.textContent = '把這一頁的畫面截圖給工程,可以直接看出是哪裡沒設定好。';
+  }
+});
+</script>
